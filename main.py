@@ -11,9 +11,6 @@ from dotenv import dotenv_values, set_key, unset_key
 from setting_ui import setting_ui, load_user_setting
 
 
-
-
-
 class MyLoginWindow(QWidget):
     # Виджет авторизации
 
@@ -121,29 +118,6 @@ class MyLoginWindow(QWidget):
             psswd = self.convert_pass_to_hash()
         else:
             psswd = ''
-
-        # self.thread = QThread()
-        # # Step 3: Create a worker object
-        # self.worker = RequestSQL()
-        # # Step 4: Move worker to the thread
-        # self.worker.moveToThread(self.thread)
-        # # Step 5: Connect signals and slots
-        # self.thread.started.connect(self.worker.run)
-        # self.worker.finished.connect(self.thread.quit)
-        # self.worker.finished.connect(self.worker.deleteLater)
-        # self.thread.finished.connect(self.thread.deleteLater)
-        # self.worker.progress.connect(self.reportProgress)
-        # # Step 6: Start the thread
-        # self.thread.start()
-
-        # # Final resets
-        # self.longRunningBtn.setEnabled(False)
-        # self.thread.finished.connect(
-        #     lambda: self.longRunningBtn.setEnabled(True)
-        # )
-        # self.thread.finished.connect(
-        #     lambda: self.stepLabel.setText("Long-Running Step: 0")
-        # )
 
         # SQL запрос на сервер
         with SQL() as sql:
@@ -314,7 +288,7 @@ class Main_UI(QtWidgets.QMainWindow):
             self.myLoginWindow.close()
             self.myLoginWindow = None
 
-        # блокировка управляющих елементов
+        # блокировка управляющих элементов
         self.line_edit_search.setEnabled(not self.btn_loginWidth)
         self.btn_menu.setEnabled(not self.btn_loginWidth)
         self.btn_search.setEnabled(not self.btn_loginWidth)
