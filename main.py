@@ -94,8 +94,10 @@ class MyLoginWindow(QWidget):
             self.info_label.setText('Поле "Login" не может быть пустым')
             return False
 
-        Checklettert = self.Letters + self.Letters.Upper + '-_!$@'
-        if self.lineEdit_login.text().strip(Checklettert) != 0:
+        Checklettert = self.Letters + self.Letters.upper() + '-_!$@'
+
+        if len(self.lineEdit_login.text().strip(Checklettert)) != 0:
+
             self.info_label.setText(
                 'Поле "Login" содержит не допустимые символы')
             return False

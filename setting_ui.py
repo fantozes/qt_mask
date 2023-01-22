@@ -1,6 +1,6 @@
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QIcon
-from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QGraphicsDropShadowEffect
 import sys
 
 
@@ -14,7 +14,7 @@ def setting_ui(self):
     self.setWindowTitle('Alfa-C')
     self.programm_name.setText(
         "<strong> <font color=yellow><i>Alfa-C<i></font></strong>")
-    shadow = QtWidgets.QGraphicsDropShadowEffect(
+    shadow = QGraphicsDropShadowEffect(
         blurRadius=10, xOffset=3, yOffset=4)
     self.programm_name.setGraphicsEffect(shadow)
 
