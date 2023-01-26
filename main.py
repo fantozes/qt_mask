@@ -6,6 +6,7 @@ from os import environ
 
 import sys
 import psycopg2
+import hashlib
 
 from dotenv import dotenv_values, set_key, unset_key
 from setting_ui import setting_ui, load_user_setting
@@ -97,38 +98,28 @@ class MyLoginWindow(QWidget):
         Checklettert = self.Letters + self.Letters.upper() + '-_!$@'
 
         if len(self.lineEdit_login.text().strip(Checklettert)) != 0:
-
             self.info_label.setText(
                 'Поле "Login" содержит не допустимые символы')
             return False
 
         return True
 
-    def convert_pass_to_hash(self):
-        # Функция хешировани
-        import hashlib
-        passwd = str(self.lineEdit_pass.text())
-        return hashlib.md5(passwd.encode()).hexdigest()
-
     def signin(self):
         # Проверка вводимых символов
         if not self.checktext():
             return
 
-        # Хеширование паролей перед отправкой в ДБ
-        if len(self.lineEdit_pass.text()) != 0:
-            psswd = self.convert_pass_to_hash()
-        else:
-            psswd = ''
+        pswd = self.lineEdit_pass.text()
+        pswd = hashlib.md5(pswd.encode()).hexdigest() if pswd else ''
 
+        # Хеширование паролей перед отправкой в ДБ
         # SQL запрос на сервер
         with SQL() as sql:
             data = sql.fetchone(
                 "SELECT first_name, father_name, last_name, access_level\n" +
                 "FROM account INNER JOIN users ON account.id_user = users.id\n" +
                 f"WHERE account.login = '{self.lineEdit_login.text()}'" +
-                (';' if (self.lineEdit_pass.text() == '') else
-                 f" AND account.pass_md5 = '{psswd}';")
+                (f" AND account.pass_md5 = '{pswd}';" if pswd else ';')
             )
 
         # print(data)
@@ -140,10 +131,9 @@ class MyLoginWindow(QWidget):
 
             env = Env_file()
             env.set_val('USERNM', self.lineEdit_login.text())
-            env.set_val('PASSMD5', psswd)
+            env.set_val('PASSMD5', pswd)
 
-            timer = QTimer()
-            timer.singleShot(500, lambda: App.b_login())
+            QTimer().singleShot(500, lambda: App.b_login())
 
         else:
             self.info_label.setText('Неверный логин или пароль')
@@ -177,11 +167,11 @@ class Main_UI(QtWidgets.QMainWindow):
 
         load_user_setting(self)
 
-    @ property
+    @property
     def access_level(self):                 # Функция чтения уровня пользователя
         return self.Application_Access
 
-    @ access_level.setter
+    @access_level.setter
     def access_level(self, level: int):     # Функция установки уровня пользователя
         self.Application_Access = level
 
@@ -237,8 +227,10 @@ class Main_UI(QtWidgets.QMainWindow):
         self.MoveReverse = self.left_panel_1Position
         self.StartValue = self.left_panel_1Max
         self.EndValue = self.left_panel_1Min
+
         self.animation()
         self.animation1.start()
+
         self.left_panel_1Position = self.MoveReverse
         self.btn_menu.setChecked(self.left_panel_1Position)
 

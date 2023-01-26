@@ -9,6 +9,12 @@
 # PASSWORD=qwerty
 # PORT=5432
 
+import hashlib
+
+
+print(hashlib.md5(None.encode()).hexdigest())
+
+
 class TelephoneDirectory:
     def __init__(self):
         self.teldict = {}
