@@ -1,45 +1,65 @@
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import QWidget, QGraphicsDropShadowEffect
-from PyQt5.QtCore import Qt,  QEasingCurve, QPropertyAnimation, QTimer, QObject, QThread
+from PyQt5.QtCore import Qt,  QEasingCurve, QPropertyAnimation, QTimer, QObject, QThread,  pyqtSignal, pyqtSlot
 
 from os import environ
 
 import sys
-import psycopg2
+
 import hashlib
+import time
 
+from setting_ui import setting_ui
 
-from setting_ui import setting_ui, load_user_setting
-
+# имя файла с настройками (Временно)
 setting_file = 'setting.ini'
+
+#######################################################################################
 
 
 class ParserIniFiles():             # Класс чтения ini файла
+    """ Класс чтения, записи в ini фаил
+    ####################################
+    return: Конфигурационный файл настроек программы
+    """
+
     from configparser import ConfigParser
 
-    def __init__(self, filename):
+    def __init__(self, filename=setting_file):
         self.__conf = self.ConfigParser()
-        self.__filename = filename
-        self.__conf.read(filename)
+        self.__filename = self.__checkvalue(filename)
+        self.__conf.read(self.__filename)
 
     def get(self, Section, Key):
+        # Метод чтения значений
         return self.__conf.get(Section, Key)
 
     def update(self, Section, Key, Value):
-        self.__conf.set(Section, Key, self.__checkvalue(Value))
+        # Метод обновления значений
+        self.__conf.set(Section,
+                        self.__checkvalue(Key),
+                        self.__checkvalue(Value)
+                        )
         self.__write()
 
     def __write(self):
+        # Метод записи файла
         with open(self.__filename, 'w') as configfile:    # save
             self.__conf.write(configfile)
 
-    @staticmethod
+    @ staticmethod
     def __checkvalue(value):
-        return str(value)
+        return value if isinstance(value, str) else str(value)
+
+#######################################################################################
 
 
 class MyLoginWindow(QWidget):
-    # Виджет авторизации
+    """Виджет авторизации в главном окне
+    ####################################
+    return: ИОФ пользователя в главное окно программы
+            Уровень доступа
+    """
 
     Letters = ('qwertyuiopasdfghjklzxcvbnm')
 
@@ -67,8 +87,8 @@ class MyLoginWindow(QWidget):
         self.load_first_setting()
 
     def selected_checkbox(self):
-        # Функция записи настроек чекбокса в env файл "Запомнить меня"
-        ini = ParserIniFiles(setting_file)
+        # Функция записи настроек чекбокса в ini файл "Запомнить меня"
+        ini = ParserIniFiles()
         ini.update(Section='Setting User',
                    Key='autosignin',
                    Value=self.remember_me.isChecked()
@@ -76,17 +96,17 @@ class MyLoginWindow(QWidget):
 
     def keyPressEvent(self, event):
         # Горячие клавиши в окне авторизации
-        # print(str(event.key()))
+        print(str(event.key()))
         if event.key() == Qt.Key_Escape:  # Закрыть окно по ESC
             App.b_login()
 
-        if str(event.key()) == "16777220":  # Qt.Key_Enter:
+        if str(event.key()) in ["16777221", "16777220"]:  # Qt.Key_Enter:
             self.signin()
 
     def load_first_setting(self):
         # Функция первоначальных настроек
         # при загрузке виджета авторизации
-        ini = ParserIniFiles(setting_file)
+        ini = ParserIniFiles()
         set = ini.get(Section='Setting User',
                       Key='autosignin'
                       )
@@ -108,7 +128,7 @@ class MyLoginWindow(QWidget):
         App.access_level = 0
         App.label_sign_in.setText("GUEST")
         self.stackedWidget.setCurrentIndex(0)
-        ini = ParserIniFiles(setting_file)
+        ini = ParserIniFiles()
         ini.update(Section='Setting User',
                    Key='user_login',
                    Value=''
@@ -140,37 +160,35 @@ class MyLoginWindow(QWidget):
         if not self.checktext():
             return
 
-        pswd = self.lineEdit_pass.text()
-        pswd = hashlib.md5(pswd.encode()).hexdigest() if pswd else ''
+        psswd = self.lineEdit_pass.text()
+        psswd = hashlib.md5(psswd.encode()).hexdigest() if psswd else ''
 
-        login = self.lineEdit_login.text()
+        user = self.lineEdit_login.text()
 
         # Хеширование паролей перед отправкой в ДБ
         # SQL запрос на сервер
-        with SQL() as sql:
-            data = sql.fetchone(
-                "SELECT first_name, father_name, last_name, access_level\n" +
-                "FROM account INNER JOIN users ON account.id_user = users.id\n" +
-                f"WHERE account.login = '{login}'" +
-                (f" AND account.pass_md5 = '{pswd}';" if pswd else ';')
-            )
 
-        # print(data)
+        sql_text = "SELECT first_name, father_name, last_name, access_level\n" + \
+            "FROM account INNER JOIN users ON account.id_user = users.id\n" + \
+            f"WHERE account.login = '{user}'" + \
+            (f" AND account.pass_md5 = '{psswd}';" if (psswd) else ';')
+
+        data = Send_to_sql.sql_requests(sql_text)
 
         if data:
             self.info_label.setText('Вход выполнен')
             App.access_level = data[3]
             App.label_sign_in.setText(f"{data[0]} {data[1]} {data[2]}")
 
-            ini = ParserIniFiles(setting_file)
+            ini = ParserIniFiles()
             ini.update(Section='Setting User',
                        Key='user_login',
-                       Value=login
+                       Value=user
                        )
 
             ini.update(Section='Setting User',
                        Key='user_password',
-                       Value=pswd
+                       Value=psswd
                        )
 
             QTimer().singleShot(500, lambda: App.b_login())
@@ -179,9 +197,15 @@ class MyLoginWindow(QWidget):
             self.info_label.setText('Неверный логин или пароль')
             App.access_level = 0
 
+#######################################################################################
+
 
 class Main_UI(QtWidgets.QMainWindow):
-    # Главное окно программы
+    """Главное окно программы
+    ####################################
+    return: Главное окно программы
+    """
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -191,7 +215,7 @@ class Main_UI(QtWidgets.QMainWindow):
         # Загрузка основных настроек формы
         setting_ui(self)
 
-        load_user_setting(self)
+        self.start_authorization()
 
     @property
     def access_level(self):                 # Функция чтения уровня пользователя
@@ -200,6 +224,37 @@ class Main_UI(QtWidgets.QMainWindow):
     @access_level.setter
     def access_level(self, level: int):     # Функция установки уровня пользователя
         self.Application_Access = level
+
+    def start_authorization(self):
+        # Функция автоматической авторизации при старте приложения
+
+        ini = ParserIniFiles()
+        remember_sign_in = ini.get(Section='Setting User',
+                                   Key='autosignin',
+                                   )
+
+        user = ini.get(Section='Setting User',
+                       Key='user_login',
+                       )
+
+        psswd = ini.get(Section='Setting User',
+                        Key='user_password',
+                        )
+
+        if remember_sign_in != 'True' and user != None:
+            return self
+
+        sql_text = "SELECT first_name, father_name, last_name, access_level\n" + \
+            "FROM account INNER JOIN users ON account.id_user = users.id\n" + \
+            f"WHERE account.login = '{user}'" + \
+            (f" AND account.pass_md5 = '{psswd}';" if (psswd) else ';')
+
+        # data = self.sql_requests(sql_text)
+        data = Send_to_sql.sql_requests(sql_text)
+
+        if data:
+            self.access_level = data[3]
+            self.label_sign_in.setText(f"{data[0]} {data[1]} {data[2]}")
 
     def enterEvent(self, event):
         # Функция вхождения курсором в программу
@@ -315,14 +370,33 @@ class Main_UI(QtWidgets.QMainWindow):
         self.btn_setting.setEnabled(not self.btn_loginWidth)
         self.left_panel_1.setEnabled(not self.btn_loginWidth)
 
+#######################################################################################
+
+
+class Send_to_sql:
+    """ Класс для отправки запроса на сервер"""
+
+    def sql_requests(sql_text):
+        # SQL запрос на сервер
+        print('отправка запроса на сервер')
+        with SQL() as sql:
+            return sql.fetchone(sql_text)
+
+#######################################################################################
+
 
 class SQL(ParserIniFiles):            # Класс для работы с базой данных postgresql
+    """ Класс для взаимодействия с БД
+    ####################################
+    return: Значения,Записи в базе данных postgresql
+    """
 
     def __init__(self):
-        super().__init__(setting_file)
+        super().__init__()
 
     def __enter__(self):
         # Подключение к БД
+        import psycopg2
 
         self.conn = psycopg2.connect(
             host=self.get('Setting Database', 'DB_HOST'),
@@ -356,11 +430,15 @@ class SQL(ParserIniFiles):            # Класс для работы с баз
         except Exception as ex_:
             print(ex_)
 
+#######################################################################################
+
 
 class MyWidget1(QWidget):        # Тестовый виджет в РАЗРАБОТКЕ
     def __init__(self, parent=None):
         super().__init__(parent)
         uic.loadUi('./forms/dashboard.ui', self)
+
+#######################################################################################
 
 
 class MyWidget2(QWidget):        # Тестовый виджет в РАЗРАБОТКЕ
@@ -369,8 +447,13 @@ class MyWidget2(QWidget):        # Тестовый виджет в РАЗРАБ
         uic.loadUi('./forms/progress.ui', self)
 
 
-if __name__ == '__main__':
+#######################################################################################
+
+if __name__ == '__main__':       # Основное окно программы
+    """ Запуск основного окна программы
+    ####################################
+    """
     Main_App = QtWidgets.QApplication(sys.argv)
     App = Main_UI()  # Переменная приложения
-    App.show()
+    App.show()       # Показать приложение
     sys.exit(Main_App.exec())

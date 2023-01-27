@@ -306,6 +306,28 @@
               </widget>
              </item>
              <item>
+              <widget class="QLabel" name="logo">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                 <horstretch>30</horstretch>
+                 <verstretch>30</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>30</width>
+                 <height>30</height>
+                </size>
+               </property>
+               <property name="styleSheet">
+                <string notr="true"/>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+              </widget>
+             </item>
+             <item>
               <widget class="QLabel" name="programm_name">
                <property name="minimumSize">
                 <size>
@@ -723,6 +745,8 @@
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
  </widget>
- <resources/>
+ <resources>
+  <include location="icons/iface/icons.qrc"/>
+ </resources>
  <connections/>
 </ui>

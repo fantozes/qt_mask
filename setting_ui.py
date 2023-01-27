@@ -82,36 +82,3 @@ def setting_ui(self):
     self.btn_loginMin = self.btn_login.minimumWidth()
     self.btn_loginMax = self.btn_login.maximumWidth()
     self.btn_login.setMaximumWidth(self.btn_loginMin)
-
-
-def load_user_setting(self):
-    # Функция автоматической авторизации в приложении
-    from main import SQL, ParserIniFiles, setting_file
-
-    ini = ParserIniFiles(setting_file)
-    remember_sign_in = ini.get(Section='Setting User',
-                               Key='autosignin',
-                               )
-
-    user = ini.get(Section='Setting User',
-                   Key='user_login',
-                   )
-
-    if remember_sign_in == 'True' and user:
-
-        psswd = ini.get(Section='Setting User',
-                        Key='user_password',
-                        )
-
-        # SQL запрос на сервер
-        with SQL() as sql:
-            data = sql.fetchone(
-                "SELECT first_name, father_name, last_name, access_level\n" +
-                "FROM account INNER JOIN users ON account.id_user = users.id\n" +
-                f"WHERE account.login = '{user}'" +
-                (f" AND account.pass_md5 = '{psswd}';" if (psswd) else ';')
-            )
-
-        if data:
-            self.access_level = data[3]
-            self.label_sign_in.setText(f"{data[0]} {data[1]} {data[2]}")

@@ -3,6 +3,15 @@
     border-radius: 5px; 
 }
 
+#logo {
+    background-image: url(:/icons/iface/logo.png);
+    background-repeat: no-repeat;
+    border: 1px;
+    border-radius: 3px;
+    border-style: inset;
+    border-color: #000099;
+}
+
 #left_panel_1{
 /*    background: #cc66ff;*/
     background-color: qlineargradient(spread:pad, x1:0, y1:1, x2:1, y2:1, stop:0.0 rgba(200, 102, 255, 255), stop:0.8 rgba(200, 102, 255, 255));

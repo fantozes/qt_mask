@@ -1,53 +1,56 @@
-
-# # User
-# USERNM=test
-# PASSMD5=81dc9bdb52d04dc20036dbd8313ed055
-# # SQL
-# DATABASE=agpz
-# HOST=176.119.159.66
-# USER=test_user
-# PASSWORD=qwerty
-# PORT=5432
-
-# [Setting Database]
-# DB_NAME=agpz
-# DB_HOST=176.119.159.66
-# DB_USER=test_user
-# DB_PASSWORD=qwerty
-# DB_PORT=5432
-
-# [Setting User]
-# AUTOSIGNIN=True
-# USER_LOGIN=test
-# USER_PASSWORD=81dc9bdb52d04dc20036dbd8313ed055
+from PyQt5 import QtCore, QtWidgets
 
 
-class ParserIniFiles():             # Класс чтения ini файла
-    from configparser import ConfigParser
+class MyThread(QtCore.QThread):
+    mysignal = QtCore.pyqtSignal(str)
 
-    def __init__(self, filename):
-        self.__conf = self.ConfigParser()
-        self.__filename = filename
-        self.__conf.read(filename)
+    def __init__(self, parent=None):
+        QtCore.QThread.__init__(self, parent)
 
-    def get(self, Section, Key):
-        return self.__conf.get(Section, Key)
-
-    def update(self, Section, Key, Value):
-        self.__conf.set(Section, Key, self.__checkvalue(Value))
-        self.__write()
-
-    def __write(self):
-        with open(self.__filename, 'w') as configfile:    # save
-            self.__conf.write(configfile)
-
-    @staticmethod
-    def __checkvalue(value):
-        return str(value)
+    def run(self):
+        for i in range(1, 21):
+            self.sleep(3)  # "Засыпаем" на 3 секунды
+            # Передача данных из потока через сигнал
+            self.mysignal.emit("i = %s" % i)
 
 
-a = ParserIniFiles('setting.ini')
-# a.write('Setting User', 'AUTOSIGNIN', False) 'setting.ini'
-print(a.get('Setting User', 'AUTOSIGNIN'))
+class MyWindow(QtWidgets.QWidget):
+    def __init__(self, parent=None):
+        QtWidgets.QWidget.__init__(self, parent)
+        self.label = QtWidgets.QLabel("Нажмите кнопку для запуска потока")
+        self.label.setAlignment(QtCore.Qt.AlignHCenter)
+        self.button = QtWidgets.QPushButton("Запустить процесс")
+        self.vbox = QtWidgets.QVBoxLayout()
+        self.vbox.addWidget(self.label)
+        self.vbox.addWidget(self.button)
+        self.setLayout(self.vbox)
+        self.mythread = MyThread()    # Создаем экземпляр класса
+        self.button.clicked.connect(self.on_clicked)
+        self.mythread.started.connect(self.on_started)
+        self.mythread.finished.connect(self.on_finished)
+        self.mythread.mysignal.connect(
+            self.on_change, QtCore.Qt.QueuedConnection)
 
-a.update('Setting User', 'AUTOSIGNIN', 123)
+    def on_clicked(self):
+        self.button.setDisabled(True)  # Делаем кнопку неактивной
+        self.mythread.start()         # Запускаем поток
+
+    def on_started(self):  # Вызывается при запуске потока
+        self.label.setText("Вызван метод on_started ()")
+
+    def on_finished(self):      # Вызывается при завершении потока
+        self.label.setText("Вызван метод on_finished()")
+        self.button.setDisabled(False)  # Делаем кнопку активной
+
+    def on_change(self, s):
+        self.label.setText(s)
+
+
+if __name__ == "__main__":
+    import sys
+    app = QtWidgets.QApplication(sys.argv)
+    window = MyWindow()
+    window.setWindowTitle("Использование класса QThread")
+    window.resize(300, 70)
+    window.show()
+    sys.exit(app.exec_())
