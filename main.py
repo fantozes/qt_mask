@@ -8,8 +8,34 @@ import sys
 import psycopg2
 import hashlib
 
-from dotenv import dotenv_values, set_key, unset_key
+
 from setting_ui import setting_ui, load_user_setting
+
+setting_file = 'setting.ini'
+
+
+class ParserIniFiles():             # Класс чтения ini файла
+    from configparser import ConfigParser
+
+    def __init__(self, filename):
+        self.__conf = self.ConfigParser()
+        self.__filename = filename
+        self.__conf.read(filename)
+
+    def get(self, Section, Key):
+        return self.__conf.get(Section, Key)
+
+    def update(self, Section, Key, Value):
+        self.__conf.set(Section, Key, self.__checkvalue(Value))
+        self.__write()
+
+    def __write(self):
+        with open(self.__filename, 'w') as configfile:    # save
+            self.__conf.write(configfile)
+
+    @staticmethod
+    def __checkvalue(value):
+        return str(value)
 
 
 class MyLoginWindow(QWidget):
@@ -42,12 +68,11 @@ class MyLoginWindow(QWidget):
 
     def selected_checkbox(self):
         # Функция записи настроек чекбокса в env файл "Запомнить меня"
-        env = Env_file()
-        if self.remember_me.isChecked() == True:
-            env.set_val('AUTOSIGNIN', 'TRUE')
-
-        else:
-            env.set_val('AUTOSIGNIN', 'FALSE')
+        ini = ParserIniFiles(setting_file)
+        ini.update(Section='Setting User',
+                   Key='autosignin',
+                   Value=self.remember_me.isChecked()
+                   )
 
     def keyPressEvent(self, event):
         # Горячие клавиши в окне авторизации
@@ -61,12 +86,12 @@ class MyLoginWindow(QWidget):
     def load_first_setting(self):
         # Функция первоначальных настроек
         # при загрузке виджета авторизации
-        env = Env_file()
-        if env.get_val('AUTOSIGNIN') == 'TRUE':
-            self.remember_me.setChecked(True)
+        ini = ParserIniFiles(setting_file)
+        set = ini.get(Section='Setting User',
+                      Key='autosignin'
+                      )
 
-        else:
-            self.remember_me.setChecked(False)
+        self.remember_me.setChecked(True if set == 'True' else False)
 
         print(App.access_level, "access_level")
         if App.access_level == 0:
@@ -83,9 +108,15 @@ class MyLoginWindow(QWidget):
         App.access_level = 0
         App.label_sign_in.setText("GUEST")
         self.stackedWidget.setCurrentIndex(0)
-        env = Env_file()
-        env.set_val('USERNM')
-        env.set_val('PASSMD5')
+        ini = ParserIniFiles(setting_file)
+        ini.update(Section='Setting User',
+                   Key='user_login',
+                   Value=''
+                   )
+        ini.update(Section='Setting User',
+                   Key='user_password',
+                   Value=''
+                   )
 
     def checktext(self):
         # Проверка Login на пустое значение
@@ -112,13 +143,15 @@ class MyLoginWindow(QWidget):
         pswd = self.lineEdit_pass.text()
         pswd = hashlib.md5(pswd.encode()).hexdigest() if pswd else ''
 
+        login = self.lineEdit_login.text()
+
         # Хеширование паролей перед отправкой в ДБ
         # SQL запрос на сервер
         with SQL() as sql:
             data = sql.fetchone(
                 "SELECT first_name, father_name, last_name, access_level\n" +
                 "FROM account INNER JOIN users ON account.id_user = users.id\n" +
-                f"WHERE account.login = '{self.lineEdit_login.text()}'" +
+                f"WHERE account.login = '{login}'" +
                 (f" AND account.pass_md5 = '{pswd}';" if pswd else ';')
             )
 
@@ -129,29 +162,22 @@ class MyLoginWindow(QWidget):
             App.access_level = data[3]
             App.label_sign_in.setText(f"{data[0]} {data[1]} {data[2]}")
 
-            env = Env_file()
-            env.set_val('USERNM', self.lineEdit_login.text())
-            env.set_val('PASSMD5', pswd)
+            ini = ParserIniFiles(setting_file)
+            ini.update(Section='Setting User',
+                       Key='user_login',
+                       Value=login
+                       )
+
+            ini.update(Section='Setting User',
+                       Key='user_password',
+                       Value=pswd
+                       )
 
             QTimer().singleShot(500, lambda: App.b_login())
 
         else:
             self.info_label.setText('Неверный логин или пароль')
             App.access_level = 0
-
-
-class Env_file():
-    # Класс чтения и записи в env файл
-    def get_val(self, Key):
-        env = dotenv_values()
-        return env.get(Key)
-
-    def set_val(self, Key, Val=None):
-        if Val:
-            set_key(".env", key_to_set=str(Key),
-                    value_to_set=str(Val))
-        else:
-            unset_key(".env", str(Key))
 
 
 class Main_UI(QtWidgets.QMainWindow):
@@ -290,25 +316,20 @@ class Main_UI(QtWidgets.QMainWindow):
         self.left_panel_1.setEnabled(not self.btn_loginWidth)
 
 
-class SQL():            # Класс для работы с базой данных postgresql
+class SQL(ParserIniFiles):            # Класс для работы с базой данных postgresql
 
     def __init__(self):
-        # Инициализация переменных из файла env
-        env = Env_file()
-        self.user = env.get_val("USER")
-        self.database = env.get_val("DATABASE")
-        self.password = env.get_val("PASSWORD")
-        self.host = env.get_val("HOST")
-        self.port = env.get_val("PORT")
+        super().__init__(setting_file)
 
     def __enter__(self):
         # Подключение к БД
+
         self.conn = psycopg2.connect(
-            database=self.database,
-            host=self.host,
-            user=self.user,
-            password=self.password,
-            port=self.port
+            host=self.get('Setting Database', 'DB_HOST'),
+            port=self.get('Setting Database', 'DB_PORT'),
+            database=self.get('Setting Database', 'DB_NAME'),
+            user=self.get('Setting Database', 'DB_USER'),
+            password=self.get('Setting Database', 'DB_PASSWORD')
         )
 
         self.cur = self.conn.cursor()

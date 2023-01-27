@@ -86,15 +86,22 @@ def setting_ui(self):
 
 def load_user_setting(self):
     # Функция автоматической авторизации в приложении
-    from main import SQL, Env_file
+    from main import SQL, ParserIniFiles, setting_file
 
-    env = Env_file()
-    remember_sign_in = env.get_val('AUTOSIGNIN')
-    user = env.get_val('USERNM')
+    ini = ParserIniFiles(setting_file)
+    remember_sign_in = ini.get(Section='Setting User',
+                               Key='autosignin',
+                               )
 
-    if remember_sign_in == 'TRUE' and user:
+    user = ini.get(Section='Setting User',
+                   Key='user_login',
+                   )
 
-        psswd = env.get_val('PASSMD5')
+    if remember_sign_in == 'True' and user:
+
+        psswd = ini.get(Section='Setting User',
+                        Key='user_password',
+                        )
 
         # SQL запрос на сервер
         with SQL() as sql:
