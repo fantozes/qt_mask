@@ -1,35 +1,42 @@
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QGraphicsDropShadowEffect
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import QGraphicsDropShadowEffect, QGraphicsOpacityEffect
 import sys
+
+# file_icon = './icons/iface/logo.png'
+file_icon = './icons/source_logo.png'
+file_style = './qss/theme_style.css'
+name_prog = 'Alfa-C'
 
 
 def setting_ui(self):
 
     # Загрузка css стилей из файла:
-    with open(file='./css/theme_style.css', mode='r') as f:
+    with open(file=file_style, mode='r') as f:
         self.setStyleSheet(f.read())
 
     # Имя программы:
-    self.setWindowTitle('Alfa-C')
-    self.programm_name.setText(
-        "<strong> <font color=yellow><i>Alfa-C<i></font></strong>")
+    self.setWindowTitle(name_prog)
+    self.programm_name.setText(name_prog)
     shadow = QGraphicsDropShadowEffect(
         blurRadius=10, xOffset=3, yOffset=4)
     self.programm_name.setGraphicsEffect(shadow)
 
     # Иконка приложения:
-    self.setWindowIcon(QIcon(
-        './icons/iface/icons8-mind-map-100.png'))
+    self.setWindowIcon(QIcon(file_icon))
+    self.pixmap = QPixmap(file_icon)
+    self.logo.setPixmap(self.pixmap)
 
     # Убрать стандартные кнопки управления окном
-    self.setWindowFlags(Qt.FramelessWindowHint)
+    # self.setWindowFlags(Qt.FramelessWindowHint)
+    self.setWindowFlags(Qt.CustomizeWindowHint)
 
     # Прозрачность окна
     self.setAttribute(Qt.WA_TranslucentBackground, False)
 
-    # Таймер для автоматического скрытия меню
-    self.timer = QTimer()
+    # self.opacity_effect = QGraphicsOpacityEffect()
+    # self.opacity_effect.setOpacity(0.3)
+    # self.bodyWidget.setGraphicsEffect(self.opacity_effect)
 
     # Кнопка закрыть приложение:
     self.btn_close.clicked.connect(sys.exit)

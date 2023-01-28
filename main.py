@@ -1,18 +1,28 @@
+from setting_ui import setting_ui
+
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtWidgets import QWidget, QGraphicsDropShadowEffect
-from PyQt5.QtCore import Qt,  QEasingCurve, QPropertyAnimation, QTimer, QObject, QThread,  pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt,  QEasingCurve, QPropertyAnimation, QAbstractAnimation, QTimer, QThread, pyqtSignal
 
 from os import environ
+from time import sleep
 
 import sys
-
 import hashlib
-import time
 
-from setting_ui import setting_ui
 
 # имя файла с настройками (Временно)
 setting_file = 'setting.ini'
+
+#######################################################################################
+
+
+class ApplicationException(Exception):
+    pass
+
+
+class ErrorConnectSql(ApplicationException):
+    print(f'[ERROR:] Ошибка подключения к базе данных')
 
 #######################################################################################
 
@@ -47,9 +57,110 @@ class ParserIniFiles():             # Класс чтения ini файла
         with open(self.__filename, 'w') as configfile:    # save
             self.__conf.write(configfile)
 
-    @ staticmethod
+    @staticmethod
     def __checkvalue(value):
         return value if isinstance(value, str) else str(value)
+
+#######################################################################################
+
+
+class SQL(ParserIniFiles):            # Класс для работы с базой данных postgresql
+    """ Класс для взаимодействия с БД
+    ####################################
+    return: Значения/Запись в базе данных postgresql
+    """
+    import psycopg2
+
+    def __init__(self):
+        super().__init__()
+        self.__psycopg2 = self.psycopg2
+
+    def __enter__(self):
+        # Подключение к БД
+        try:
+            self.conn = self.__psycopg2.connect(
+                host=self.get('Setting Database', 'DB_HOST'),
+                port=self.get('Setting Database', 'DB_PORT'),
+                database=self.get('Setting Database', 'DB_NAME'),
+                user=self.get('Setting Database', 'DB_USER'),
+                password=self.get('Setting Database', 'DB_PASSWORD')
+            )
+            self.cur = self.conn.cursor()
+            # return self
+        except ErrorConnectSql as ex_:
+            print(f'[ERROR:] {ex_}')
+
+        return self
+
+    def __exit__(self, type, value, traceback):
+        # Закрытие подключения с БД
+        print('Закрытие соединния с бд')
+        if self.cur:
+            self.cur.close()
+            self.conn.close()
+
+    def fetchall(self, sql):
+        # Прочитать все из БД
+        try:
+            self.cur.execute(sql)
+            return self.cur.fetchall()
+        except Exception as ex_:
+            print(f'[ERROR:] {ex_}')
+
+    def fetchone(self, sql):
+        # Прочитать одну строку из БД
+        try:
+            self.cur.execute(sql)
+            return self.cur.fetchone()
+        except Exception as ex_:
+            print(f'[ERROR:] {ex_}')
+
+#######################################################################################
+
+
+class SqlRequestsOneRow:
+    """ Класс для отправки запроса на сервер
+    ####################################
+    return: одну строку ответа с сервера
+    """
+
+    def requests(sql_text):
+        # SQL запрос на сервер
+        print('отправка запроса на сервер')
+        with SQL() as sql:
+            return sql.fetchone(sql_text)
+
+#######################################################################################
+
+
+class SqlRequestsAllRow:
+    """ Класс для отправки запроса на сервер
+    ####################################
+    return: все строки ответа с сервера
+    """
+
+    def requests(sql_text):
+        # SQL запрос на сервер
+        print('отправка запроса на сервер')
+        with SQL() as sql:
+            return sql.fetchall(sql_text)
+
+#######################################################################################
+
+
+class SendWidgetInstanceThread(QThread):
+    mysignal = pyqtSignal(tuple)
+
+    def __init__(self, exec_func, parent=None):
+        super(SendWidgetInstanceThread, self).__init__(parent)
+        self.__exec_func = exec_func
+
+    def run(self):
+        try:
+            __data = self.__exec_func()
+            self.mysignal.emit(__data)
+        except Exception as ex_:
+            print(ex_)
 
 #######################################################################################
 
@@ -160,21 +271,30 @@ class MyLoginWindow(QWidget):
         if not self.checktext():
             return
 
-        psswd = self.lineEdit_pass.text()
-        psswd = hashlib.md5(psswd.encode()).hexdigest() if psswd else ''
+        self.psswd = self.lineEdit_pass.text()
+        self.psswd = hashlib.md5(
+            self.psswd.encode()).hexdigest() if self.psswd else ''
 
-        user = self.lineEdit_login.text()
+        self.user = self.lineEdit_login.text()
 
         # Хеширование паролей перед отправкой в ДБ
         # SQL запрос на сервер
 
         sql_text = "SELECT first_name, father_name, last_name, access_level\n" + \
             "FROM account INNER JOIN users ON account.id_user = users.id\n" + \
-            f"WHERE account.login = '{user}'" + \
-            (f" AND account.pass_md5 = '{psswd}';" if (psswd) else ';')
+            f"WHERE account.login = '{self.user}'" + \
+            (f" AND account.pass_md5 = '{self.psswd}';" if (
+                self.psswd) else ';')
 
-        data = Send_to_sql.sql_requests(sql_text)
+        # data = SqlRequestsOneRow.requests(sql_text)
 
+        self.a = SendWidgetInstanceThread(
+            lambda: SqlRequestsOneRow.requests(sql_text))
+        # self.a.finished.connect(self.on_FinishedThread)
+        self.a.mysignal.connect(self.on_SignalThread, Qt.QueuedConnection)
+        self.a.start()
+
+    def on_SignalThread(self, data):
         if data:
             self.info_label.setText('Вход выполнен')
             App.access_level = data[3]
@@ -183,12 +303,12 @@ class MyLoginWindow(QWidget):
             ini = ParserIniFiles()
             ini.update(Section='Setting User',
                        Key='user_login',
-                       Value=user
+                       Value=self.user
                        )
 
             ini.update(Section='Setting User',
                        Key='user_password',
-                       Value=psswd
+                       Value=self.psswd
                        )
 
             QTimer().singleShot(500, lambda: App.b_login())
@@ -215,6 +335,7 @@ class Main_UI(QtWidgets.QMainWindow):
         # Загрузка основных настроек формы
         setting_ui(self)
 
+        # Авторизация пользователя при старте программы
         self.start_authorization()
 
     @property
@@ -241,17 +362,26 @@ class Main_UI(QtWidgets.QMainWindow):
                         Key='user_password',
                         )
 
-        if remember_sign_in != 'True' and user != None:
-            return self
+        if remember_sign_in == 'True' and user != '':
 
-        sql_text = "SELECT first_name, father_name, last_name, access_level\n" + \
-            "FROM account INNER JOIN users ON account.id_user = users.id\n" + \
-            f"WHERE account.login = '{user}'" + \
-            (f" AND account.pass_md5 = '{psswd}';" if (psswd) else ';')
+            sql_text = "SELECT first_name, father_name, last_name, access_level\n" + \
+                "FROM account INNER JOIN users ON account.id_user = users.id\n" + \
+                f"WHERE account.login = '{user}'" + \
+                (f" AND account.pass_md5 = '{psswd}';" if (psswd) else ';')
 
-        # data = self.sql_requests(sql_text)
-        data = Send_to_sql.sql_requests(sql_text)
+            # data = self.sql_requests(sql_text)
+            # data = SqlRequestsOneRow.requests(sql_text)
 
+            self.a = SendWidgetInstanceThread(
+                lambda: SqlRequestsOneRow.requests(sql_text))
+            self.a.finished.connect(self.on_FinishedThread)
+            self.a.mysignal.connect(self.on_SignalThread, Qt.QueuedConnection)
+            self.a.start()
+
+    def on_FinishedThread(self):
+        print('finished thread')
+
+    def on_SignalThread(self, data):
         if data:
             self.access_level = data[3]
             self.label_sign_in.setText(f"{data[0]} {data[1]} {data[2]}")
@@ -283,37 +413,25 @@ class Main_UI(QtWidgets.QMainWindow):
             self.showMaximized()
             self.btn_fscreen.setChecked(True)
 
-    def animation(self):
-
-        self.animation1 = QPropertyAnimation(
-            self.control, b"minimumWidth")
-        self.animation1.setDuration(self.DurationAnimation)
-        self.animation1.setEasingCurve(self.TypeAnimation)
-
-        if self.MoveReverse:
-            self.animation1.setStartValue(self.StartValue)
-            self.animation1.setEndValue(self.EndValue)
-
-        else:
-            self.animation1.setStartValue(self.EndValue)
-            self.animation1.setEndValue(self.StartValue)
-
-        self.MoveReverse = not self.MoveReverse
-
     def b_show_menu(self):
         # Кнопка show menu:
         print('show_menu')
-        self.control = self.left_panel_1
-        self.TypeAnimation = QEasingCurve.Type.InOutCirc
-        self.MoveReverse = self.left_panel_1Position
-        self.StartValue = self.left_panel_1Max
-        self.EndValue = self.left_panel_1Min
+        self.animation = QPropertyAnimation(
+            self.left_panel_1, b"minimumWidth")
+        self.animation.setDuration(self.DurationAnimation)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)
+        self.animation.setStartValue(self.left_panel_1Max)
+        self.animation.setEndValue(self.left_panel_1Min)
 
-        self.animation()
-        self.animation1.start()
+        if self.left_panel_1Position:
+            self.animation.setDirection(QAbstractAnimation.Forward)
+        else:
+            self.animation.setDirection(QAbstractAnimation.Backward)
 
-        self.left_panel_1Position = self.MoveReverse
-        self.btn_menu.setChecked(self.left_panel_1Position)
+        self.animation.start()
+
+        self.btn_menu.setChecked(not self.left_panel_1Position)
+        self.left_panel_1Position = self.btn_menu.isChecked()
 
     # Кнопки управления из формы:
 
@@ -323,33 +441,43 @@ class Main_UI(QtWidgets.QMainWindow):
 
     def b_setting(self):
         # Кнопка настроек главного окна программы
-        self.control = self.btn_setting
-        self.TypeAnimation = QEasingCurve.Type.InOutQuart
-        self.MoveReverse = self.btn_settingWidth
-        self.StartValue = self.btn_settingMax
-        self.EndValue = self.btn_settingMin
+        self.animation = QPropertyAnimation(
+            self.btn_setting, b"minimumWidth")
+        self.animation.setDuration(self.DurationAnimation)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)
+        self.animation.setStartValue(self.btn_settingMax)
+        self.animation.setEndValue(self.btn_settingMin)
 
-        self.animation()
-        self.animation1.start()
+        if self.btn_settingWidth:
+            self.animation.setDirection(QAbstractAnimation.Forward)
+        else:
+            self.animation.setDirection(QAbstractAnimation.Backward)
 
-        self.btn_settingWidth = self.MoveReverse
-        self.btn_setting.setChecked(self.MoveReverse)
+        self.animation.start()
 
-        print(f'Настройки главного окна {self.btn_login.isChecked()}')
+        self.btn_setting.setChecked(not self.btn_settingWidth)
+        self.btn_settingWidth = self.btn_setting.isChecked()
+
+        print(f'Настройки главного окна {self.btn_settingWidth}')
 
     def b_login(self):
         # Кнопка Login:
-        self.control = self.btn_login
-        self.TypeAnimation = QEasingCurve.Type.InOutQuart
-        self.MoveReverse = self.btn_loginWidth
-        self.StartValue = self.btn_loginMax
-        self.EndValue = self.btn_loginMin
+        self.animation = QPropertyAnimation(
+            self.btn_login, b"minimumWidth")
+        self.animation.setDuration(self.DurationAnimation)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutCirc)
+        self.animation.setStartValue(self.btn_loginMax)
+        self.animation.setEndValue(self.btn_loginMin)
 
-        self.animation()
-        self.animation1.start()
+        if self.btn_loginWidth:
+            self.animation.setDirection(QAbstractAnimation.Forward)
+        else:
+            self.animation.setDirection(QAbstractAnimation.Backward)
 
-        self.btn_loginWidth = self.MoveReverse
-        self.btn_login.setChecked(self.MoveReverse)
+        self.animation.start()
+
+        self.btn_login.setChecked(not self.btn_loginWidth)
+        self.btn_loginWidth = self.btn_login.isChecked()
 
         print(f'авторизация пользователя {self.btn_login.isChecked()}')
 
@@ -373,66 +501,6 @@ class Main_UI(QtWidgets.QMainWindow):
 #######################################################################################
 
 
-class Send_to_sql:
-    """ Класс для отправки запроса на сервер"""
-
-    def sql_requests(sql_text):
-        # SQL запрос на сервер
-        print('отправка запроса на сервер')
-        with SQL() as sql:
-            return sql.fetchone(sql_text)
-
-#######################################################################################
-
-
-class SQL(ParserIniFiles):            # Класс для работы с базой данных postgresql
-    """ Класс для взаимодействия с БД
-    ####################################
-    return: Значения,Записи в базе данных postgresql
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def __enter__(self):
-        # Подключение к БД
-        import psycopg2
-
-        self.conn = psycopg2.connect(
-            host=self.get('Setting Database', 'DB_HOST'),
-            port=self.get('Setting Database', 'DB_PORT'),
-            database=self.get('Setting Database', 'DB_NAME'),
-            user=self.get('Setting Database', 'DB_USER'),
-            password=self.get('Setting Database', 'DB_PASSWORD')
-        )
-
-        self.cur = self.conn.cursor()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        # Закрытие подключения с БД
-        self.cur.close()
-        self.conn.close()
-
-    def fetchall(self, sql):
-        # Прочитать все из БД
-        try:
-            self.cur.execute(sql)
-            return self.cur.fetchall()
-        except Exception as ex_:
-            print(ex_)
-
-    def fetchone(self, sql):
-        # Прочитать одну строку из БД
-        try:
-            self.cur.execute(sql)
-            return self.cur.fetchone()
-        except Exception as ex_:
-            print(ex_)
-
-#######################################################################################
-
-
 class MyWidget1(QWidget):        # Тестовый виджет в РАЗРАБОТКЕ
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -446,8 +514,8 @@ class MyWidget2(QWidget):        # Тестовый виджет в РАЗРАБ
         super().__init__(parent)
         uic.loadUi('./forms/progress.ui', self)
 
-
 #######################################################################################
+
 
 if __name__ == '__main__':       # Основное окно программы
     """ Запуск основного окна программы
