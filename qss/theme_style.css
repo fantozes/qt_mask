@@ -2,6 +2,7 @@
     border-style: inset;
     border-radius: 5px;
     /* background:transparent; */
+    background:transparent;
 }
 
 .QLabel#programm_name {
@@ -41,12 +42,13 @@
     border-color: #000099;
 }
 
-/*
-#bodyWidget {
-    background: url("./img/different1.png")  repeat;
-    opacity: 0,2;
+
+#bg_widget {
+
+    background: url("./img/minimal-rhombus-pattern_1159-2407.webp")  repeat;
+    opacity: 127;
 }
-*/
+
 
 #fr_sing_in #btn_login, #btn_setting {
     font-size: 16px;

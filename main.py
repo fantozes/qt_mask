@@ -160,7 +160,8 @@ class SendWidgetInstanceThread(QThread):
             __data = self.__exec_func()
             self.mysignal.emit(__data)
         except Exception as ex_:
-            print(ex_)
+            print(f'[ERROR] {ex_}')
+
 
 #######################################################################################
 
@@ -483,12 +484,20 @@ class Main_UI(QtWidgets.QMainWindow):
 
         if self.btn_loginWidth:
             self.myLoginWindow = MyLoginWindow()
-            self.bodyWidget.addWidget(self.myLoginWindow)
-            self.myLoginWindow.lineEdit_login.setFocus()
+            # self.bodyWidget.addWidget(self.myLoginWindow)
+            # self.bodyWidget.setCurrentIndex(3)
+            # self.myLoginWindow.lineEdit_login.setFocus()
+
+            self.layout = QtWidgets.QVBoxLayout()
+            self.layout.addWidget(self.myLoginWindow)
+            self.bg_widget.setLayout(self.layout)
 
         else:
-            self.bodyWidget.removeWidget(self.myLoginWindow)
-            self.myLoginWindow.close()
+            # self.bodyWidget.removeWidget(self.myLoginWindow)
+            self.layout.removeWidget(self.myLoginWindow)
+            self.layout.deleteLater()
+            # self.myLoginWindow.deleteLater()
+            # self.myLoginWindow.close()
             self.myLoginWindow = None
 
         # блокировка управляющих элементов
@@ -497,6 +506,7 @@ class Main_UI(QtWidgets.QMainWindow):
         self.btn_search.setEnabled(not self.btn_loginWidth)
         self.btn_setting.setEnabled(not self.btn_loginWidth)
         self.left_panel_1.setEnabled(not self.btn_loginWidth)
+
 
 #######################################################################################
 

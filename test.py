@@ -1,56 +1,127 @@
-from PyQt5 import QtCore, QtWidgets
+
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtWidgets import (QApplication, QDialog, QLayout, QGridLayout,
+                               QMessageBox, QGroupBox, QSpinBox, QSlider,
+                               QProgressBar, QDial, QDialogButtonBox,
+                               QComboBox, QLabel)
 
 
-class MyThread(QtCore.QThread):
-    mysignal = QtCore.pyqtSignal(str)
+class Dialog(QDialog):
+    def __init__(self):
+        super().__init__()
 
-    def __init__(self, parent=None):
-        QtCore.QThread.__init__(self, parent)
+        self._rotable_widgets = []
 
-    def run(self):
-        for i in range(1, 21):
-            self.sleep(3)  # "Засыпаем" на 3 секунды
-            # Передача данных из потока через сигнал
-            self.mysignal.emit("i = %s" % i)
+        self.create_rotable_group_box()
+        self.create_options_group_box()
+        self.create_button_box()
+
+        main_layout = QGridLayout()
+        main_layout.addWidget(self._rotable_group_box, 0, 0)
+        main_layout.addWidget(self._options_group_box, 1, 0)
+        main_layout.addWidget(self._button_box, 2, 0)
+        main_layout.setSizeConstraint(QLayout.SetMinimumSize)
+
+        self._main_layout = main_layout
+        self.setLayout(self._main_layout)
+
+        self.setWindowTitle("Dynamic Layouts")
+
+    def rotate_widgets(self):
+        count = len(self._rotable_widgets)
+        if count % 2 == 1:
+            raise AssertionError("Number of widgets must be even")
+
+        for widget in self._rotable_widgets:
+            self._rotable_layout.removeWidget(widget)
+
+        self._rotable_widgets.append(self._rotable_widgets.pop(0))
+
+        for i in range(count // 2):
+            self._rotable_layout.addWidget(self._rotable_widgets[count - i - 1], 0, i)
+            self._rotable_layout.addWidget(self._rotable_widgets[i], 1, i)
+
+    def buttons_orientation_changed(self, index):
+        self._main_layout.setSizeConstraint(QLayout.SetNoConstraint)
+        self.setMinimumSize(0, 0)
+
+        orientation = Qt.Orientation(self._buttons_orientation_combo_box.itemData(index))
+
+        if orientation == self._button_box.orientation():
+            return
+
+        self._main_layout.removeWidget(self._button_box)
+
+        spacing = self._main_layout.spacing()
+
+        old_size_hint = self._button_box.sizeHint() + QSize(spacing, spacing)
+        self._button_box.setOrientation(orientation)
+        new_size_hint = self._button_box.sizeHint() + QSize(spacing, spacing)
+
+        if orientation == Qt.Horizontal:
+            self._main_layout.addWidget(self._button_box, 2, 0)
+            self.resize(self.size() + QSize(-old_size_hint.width(), new_size_hint.height()))
+        else:
+            self._main_layout.addWidget(self._button_box, 0, 3, 2, 1)
+            self.resize(self.size() + QSize(new_size_hint.width(), -old_size_hint.height()))
+
+        self._main_layout.setSizeConstraint(QLayout.SetDefaultConstraint)
+
+    def show_help(self):
+        QMessageBox.information(self, "Dynamic Layouts Help",
+                            "This example shows how to change layouts "
+                            "dynamically.")
+
+    def create_rotable_group_box(self):
+        self._rotable_group_box = QGroupBox("Rotable Widgets")
+
+        self._rotable_widgets.append(QSpinBox())
+        self._rotable_widgets.append(QSlider())
+        self._rotable_widgets.append(QDial())
+        self._rotable_widgets.append(QProgressBar())
+        count = len(self._rotable_widgets)
+        for i in range(count):
+            element = self._rotable_widgets[(i + 1) % count]
+            self._rotable_widgets[i].valueChanged[int].connect(element.setValue)
+
+        self._rotable_layout = QGridLayout()
+        self._rotable_group_box.setLayout(self._rotable_layout)
+
+        self.rotate_widgets()
+
+    def create_options_group_box(self):
+        self._options_group_box = QGroupBox("Options")
+
+        buttons_orientation_label = QLabel("Orientation of buttons:")
+
+        buttons_orientation_combo_box = QComboBox()
+        buttons_orientation_combo_box.addItem("Horizontal", Qt.Horizontal)
+        buttons_orientation_combo_box.addItem("Vertical", Qt.Vertical)
+        buttons_orientation_combo_box.currentIndexChanged[int].connect(self.buttons_orientation_changed)
+
+        self._buttons_orientation_combo_box = buttons_orientation_combo_box
+
+        options_layout = QGridLayout()
+        options_layout.addWidget(buttons_orientation_label, 0, 0)
+        options_layout.addWidget(self._buttons_orientation_combo_box, 0, 1)
+        options_layout.setColumnStretch(2, 1)
+        self._options_group_box.setLayout(options_layout)
+
+    def create_button_box(self):
+        self._button_box = QDialogButtonBox()
+
+        close_button = self._button_box.addButton(QDialogButtonBox.Close)
+        help_button = self._button_box.addButton(QDialogButtonBox.Help)
+        rotate_widgets_button = self._button_box.addButton("Rotate &Widgets", QDialogButtonBox.ActionRole)
+
+        rotate_widgets_button.clicked.connect(self.rotate_widgets)
+        close_button.clicked.connect(self.close)
+        help_button.clicked.connect(self.show_help)
 
 
-class MyWindow(QtWidgets.QWidget):
-    def __init__(self, parent=None):
-        QtWidgets.QWidget.__init__(self, parent)
-        self.label = QtWidgets.QLabel("Нажмите кнопку для запуска потока")
-        self.label.setAlignment(QtCore.Qt.AlignHCenter)
-        self.button = QtWidgets.QPushButton("Запустить процесс")
-        self.vbox = QtWidgets.QVBoxLayout()
-        self.vbox.addWidget(self.label)
-        self.vbox.addWidget(self.button)
-        self.setLayout(self.vbox)
-        self.mythread = MyThread()    # Создаем экземпляр класса
-        self.button.clicked.connect(self.on_clicked)
-        self.mythread.started.connect(self.on_started)
-        self.mythread.finished.connect(self.on_finished)
-        self.mythread.mysignal.connect(
-            self.on_change, QtCore.Qt.QueuedConnection)
-
-    def on_clicked(self):
-        self.button.setDisabled(True)  # Делаем кнопку неактивной
-        self.mythread.start()         # Запускаем поток
-
-    def on_started(self):  # Вызывается при запуске потока
-        self.label.setText("Вызван метод on_started ()")
-
-    def on_finished(self):      # Вызывается при завершении потока
-        self.label.setText("Вызван метод on_finished()")
-        self.button.setDisabled(False)  # Делаем кнопку активной
-
-    def on_change(self, s):
-        self.label.setText(s)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     import sys
-    app = QtWidgets.QApplication(sys.argv)
-    window = MyWindow()
-    window.setWindowTitle("Использование класса QThread")
-    window.resize(300, 70)
-    window.show()
-    sys.exit(app.exec_())
+
+    app = QApplication(sys.argv)
+    dialog = Dialog()
+    dialog.exec()

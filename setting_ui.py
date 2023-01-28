@@ -32,7 +32,7 @@ def setting_ui(self):
     self.setWindowFlags(Qt.CustomizeWindowHint)
 
     # Прозрачность окна
-    self.setAttribute(Qt.WA_TranslucentBackground, False)
+    self.setAttribute(Qt.WA_TranslucentBackground, True)
 
     # self.opacity_effect = QGraphicsOpacityEffect()
     # self.opacity_effect.setOpacity(0.3)
@@ -70,7 +70,7 @@ def setting_ui(self):
     self.Application_Access = 0
 
     # Скорость анимации
-    self.DurationAnimation = 400
+    self.DurationAnimation = 300
 
     # Анимация левого меню #1
     self.left_panel_1Position = False
