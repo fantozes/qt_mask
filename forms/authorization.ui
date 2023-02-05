@@ -34,11 +34,17 @@
   <property name="styleSheet">
    <string notr="true">#auth {
 	background-color: None;
+	background:transparent;
+	
+}
+
+.QWidget#auth {
+	background-color: rgba(110, 110, 110, 220);
 }
 
 .QFrame {
-	background-color: rgb(114, 173, 185);
-	border-radius: 10px;
+	background-color: rgba(114, 173, 185, 220);
+	border-radius: 8px;
 }
 
 .QLineEdit {
@@ -81,7 +87,7 @@
    <item alignment="Qt::AlignRight|Qt::AlignTop">
     <widget class="QStackedWidget" name="stackedWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="page_1">
       <layout class="QHBoxLayout" name="horizontalLayout_2">

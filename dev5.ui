@@ -234,16 +234,16 @@
            <number>0</number>
           </property>
           <property name="leftMargin">
-           <number>2</number>
+           <number>0</number>
           </property>
           <property name="topMargin">
-           <number>3</number>
+           <number>0</number>
           </property>
           <property name="rightMargin">
            <number>2</number>
           </property>
           <property name="bottomMargin">
-           <number>4</number>
+           <number>0</number>
           </property>
           <item>
            <widget class="QFrame" name="fr_top_left">
@@ -812,6 +812,26 @@
    </layout>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
+  <action name="action">
+   <property name="text">
+    <string>Открыть</string>
+   </property>
+  </action>
+  <action name="action_2">
+   <property name="text">
+    <string>Сохранить</string>
+   </property>
+  </action>
+  <action name="action_3">
+   <property name="text">
+    <string>Сохранить как</string>
+   </property>
+  </action>
+  <action name="action_5">
+   <property name="text">
+    <string>Закрыть</string>
+   </property>
+  </action>
  </widget>
  <resources>
   <include location="icons/iface/icons.qrc"/>
